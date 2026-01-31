@@ -1,0 +1,13 @@
+#!/bin/bash
+# =============================================================================
+# Buildkite Pre-Exit Hook
+# =============================================================================
+# Cleanup tasks that run regardless of job success/failure
+# =============================================================================
+
+# Cleanup any temporary Slurm log files
+if [ -n "${BUILDKITE_BUILD_CHECKOUT_PATH:-}" ]; then
+  find "${BUILDKITE_BUILD_CHECKOUT_PATH}" -name "slurm-*.log" -mtime +7 -delete 2>/dev/null || true
+fi
+
+# Add any other cleanup tasks here

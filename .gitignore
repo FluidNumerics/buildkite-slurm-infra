@@ -1,0 +1,12 @@
+# Agent configuration with tokens
+/buildkite/agent.cfg
+
+# Temporary files
+*.tmp
+*.log
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
