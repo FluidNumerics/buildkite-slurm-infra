@@ -1,6 +1,6 @@
 # Buildkite + Slurm CI Infrastructure
 
-Infrastructure for running Buildkite CI/CD on Slurm clusters with multiple GPU architectures.
+Infrastructure for running Buildkite CI/CD on Slurm clusters.
 
 ## Quick Start
 
@@ -11,7 +11,7 @@ Infrastructure for running Buildkite CI/CD on Slurm clusters with multiple GPU a
    The agent will automatically detect your Slurm cluster name and use it as the queue tag.
 
 2. **Configure for your cluster:**
-   Edit `buildkite/hooks/pre-command` to set your partition names and constraints
+   Edit `buildkite/hooks/pre-command` to set your partition names, constraints, or to modify the Slurm batch script template
 
 3. **Deploy hooks:**
    ```bash

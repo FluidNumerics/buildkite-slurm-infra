@@ -2,10 +2,10 @@
 # Copy this to your project at .buildkite/pipeline.yml and customize
 
 steps:
-  - label: ":nvidia: Build & Test - V100"
+  - label: ":amd-mi210: Build & Test - MI210"
     command: |
       # Commands run inside Slurm job via enroot/pyxis
-      srun --container-image=/path/to/base-v100.sqsh \
+      srun --container-image=/path/to/dev-environment-image.sqshfs \
            --container-mounts=${BUILDKITE_BUILD_CHECKOUT_PATH}:/workspace \
            --container-workdir=/workspace \
            bash -c "
@@ -16,43 +16,36 @@ steps:
              ctest --test-dir build --output-on-failure
            "
     env:
-      BUILDKITE_PLUGIN_GPU_ARCH: "v100"
+      BUILDKITE_SLURM_PARTITION: "main"
+      BUILDKITE_SLURM_GRES: "gpu:mi210:4"
+      BUILDKITE_SLURM_TIME: "01:00:00"
+      BUILDKITE_SLURM_NODES: "1"
+      BUILDKITE_SLURM_CPUS_PER_TASK: "8"
+      BUILDKITE_SLURM_NTASKS_PER_NODE: "1"
     agents:
       queue: "your-cluster-name"  # Use your cluster name or "*" for any cluster
       slurm: "true"
 
-  - label: ":amd: Build & Test - MI210"
+  - label: ":amd-mi300a: Build & Test - MI300A"
     command: |
-      srun --container-image=/path/to/base-mi210.sqsh \
+      # Commands run inside Slurm job via enroot/pyxis
+      srun --container-image=/path/to/dev-environment-image.sqshfs \
            --container-mounts=${BUILDKITE_BUILD_CHECKOUT_PATH}:/workspace \
            --container-workdir=/workspace \
            bash -c "
              cmake -B build -S . \
                -DCMAKE_BUILD_TYPE=Release \
-               -DCMAKE_HIP_ARCHITECTURES=gfx90a &&
+               -DCMAKE_CUDA_ARCHITECTURES=70 &&
              cmake --build build -j\$(nproc) &&
              ctest --test-dir build --output-on-failure
            "
     env:
-      BUILDKITE_PLUGIN_GPU_ARCH: "mi210"
-    agents:
-      queue: "your-cluster-name"  # Use your cluster name or "*" for any cluster
-      slurm: "true"
-
-  - label: ":amd: Build & Test - MI300A"
-    command: |
-      srun --container-image=/path/to/base-mi300a.sqsh \
-           --container-mounts=${BUILDKITE_BUILD_CHECKOUT_PATH}:/workspace \
-           --container-workdir=/workspace \
-           bash -c "
-             cmake -B build -S . \
-               -DCMAKE_BUILD_TYPE=Release \
-               -DCMAKE_HIP_ARCHITECTURES=gfx942 &&
-             cmake --build build -j\$(nproc) &&
-             ctest --test-dir build --output-on-failure
-           "
-    env:
-      BUILDKITE_PLUGIN_GPU_ARCH: "mi300a"
+      BUILDKITE_SLURM_PARTITION: "main"
+      BUILDKITE_SLURM_GRES: "gpu:mi210:4"
+      BUILDKITE_SLURM_TIME: "01:00:00"
+      BUILDKITE_SLURM_NODES: "1"
+      BUILDKITE_SLURM_CPUS_PER_TASK: "8"
+      BUILDKITE_SLURM_NTASKS_PER_NODE: "1"
     agents:
       queue: "your-cluster-name"  # Use your cluster name or "*" for any cluster
       slurm: "true"
@@ -64,4 +57,4 @@ steps:
     command: |
       buildkite-agent artifact upload "build/Testing/**/*"
     agents:
-      queue: "gpu"
+      queue: "your-cluster-name"

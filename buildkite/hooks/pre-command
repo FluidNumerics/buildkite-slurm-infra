@@ -14,6 +14,7 @@ GRES="${BUILDKITE_SLURM_GRES:-}"
 TIME_LIMIT="${BUILDKITE_SLURM_TIME:-01:00:00}"
 NODES="${BUILDKITE_SLURM_NODES:-1}"
 NTASKS_PER_NODE="${BUILDKITE_SLURM_NTASKS_PER_NODE:-1}"
+CPUS_PER_TASK="${BUILDKITE_SLURM_CPUS_PER_TASK:-1}"
 
 # =============================================================================
 # Build Slurm submission script
@@ -39,6 +40,7 @@ cat >"$SBATCH_SCRIPT" <<SBATCH_EOF
 ${PARTITION_LINE}
 #SBATCH --nodes=${NODES}
 #SBATCH --ntasks-per-node=${NTASKS_PER_NODE}
+#SBATCH --cpus-per-task=${CPUS_PER_TASK}
 ${GRES_LINE}
 #SBATCH --time=${TIME_LIMIT}
 #SBATCH --output=${LOG_FILE}
