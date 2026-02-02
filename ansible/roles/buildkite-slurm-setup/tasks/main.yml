@@ -1,0 +1,54 @@
+---
+# Configure Slurm accounting for buildkite-agent user
+
+- name: Check if buildkite-agent user exists in Slurm
+  command: sacctmgr show user buildkite-agent -n
+  register: slurm_user_check
+  changed_when: false
+  failed_when: false
+
+- name: Create CI account if requested
+  command: >
+    sacctmgr -i add account {{ slurm_ci_account_name }}
+    Description="{{ slurm_ci_account_description }}"
+  when:
+    - slurm_create_ci_account
+    - "'{{ slurm_ci_account_name }}' not in slurm_user_check.stdout"
+  register: account_creation
+  failed_when:
+    - account_creation.rc != 0
+    - "'already exists' not in account_creation.stderr"
+
+- name: Determine account to use
+  set_fact:
+    target_account: "{{ slurm_ci_account_name if slurm_create_ci_account else slurm_account }}"
+
+- name: Add buildkite-agent user to Slurm
+  command: >
+    sacctmgr -i add user buildkite-agent
+    account={{ target_account }}
+    cluster={{ buildkite_cluster_name }}
+    DefaultAccount={{ target_account }}
+  when: "'buildkite-agent' not in slurm_user_check.stdout"
+  register: user_creation
+  failed_when:
+    - user_creation.rc != 0
+    - "'already exists' not in user_creation.stderr"
+
+- name: Set resource limits
+  command: >
+    sacctmgr -i modify user buildkite-agent
+    set MaxJobs={{ slurm_max_jobs }}
+    MaxSubmitJobs={{ slurm_max_submit_jobs }}
+  when:
+    - slurm_max_jobs is defined
+    - slurm_max_submit_jobs is defined
+
+- name: Verify Slurm configuration
+  command: sacctmgr show user buildkite-agent -s
+  register: slurm_verify
+  changed_when: false
+
+- name: Display Slurm user configuration
+  debug:
+    msg: "{{ slurm_verify.stdout_lines }}"

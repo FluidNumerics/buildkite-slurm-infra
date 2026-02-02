@@ -10,3 +10,24 @@
 # OS files
 .DS_Store
 Thumbs.db
+# Ansible
+*.retry
+.ansible/
+/tmp/
+
+# Inventories (may contain sensitive info)
+inventories/production.ini
+inventories/*.ini
+!inventories/example.ini
+
+# Variables (may contain tokens)
+group_vars/production.yml
+group_vars/*.yml
+!group_vars/all.yml.example
+
+# Facts cache
+/facts/
+
+# OS files
+.DS_Store
+Thumbs.db

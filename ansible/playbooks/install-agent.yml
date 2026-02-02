@@ -1,0 +1,33 @@
+---
+# Install Buildkite agent on login nodes
+
+- name: Install Buildkite agent
+  hosts: login_nodes
+  gather_facts: yes
+  roles:
+    - buildkite-agent-install
+
+  post_tasks:
+    - name: Wait for agent to start
+      wait_for:
+        timeout: 10
+
+    - name: Check agent status
+      systemd:
+        name: buildkite-agent
+      register: agent_status
+      become: yes
+
+    - name: Display agent status
+      debug:
+        msg: "{{ inventory_hostname }}: Agent is {{ agent_status.status.ActiveState }}"
+
+    - name: Get recent agent logs
+      command: journalctl -u buildkite-agent -n 20 --no-pager
+      register: agent_logs
+      become: yes
+      changed_when: false
+
+    - name: Display agent logs
+      debug:
+        msg: "{{ agent_logs.stdout_lines }}"

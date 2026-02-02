@@ -1,0 +1,18 @@
+---
+# Install Buildkite agent on RHEL/Rocky/CentOS
+
+- name: Add Buildkite repository
+  yum_repository:
+    name: buildkite-agent
+    description: Buildkite Pty Ltd
+    baseurl: https://yum.buildkite.com/buildkite-agent/stable/x86_64/
+    enabled: yes
+    gpgcheck: no
+    priority: 1
+  become: yes
+
+- name: Install buildkite-agent
+  yum:
+    name: buildkite-agent
+    state: present
+  become: yes

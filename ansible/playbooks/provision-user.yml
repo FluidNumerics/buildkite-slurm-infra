@@ -1,0 +1,18 @@
+---
+# Provision buildkite-agent user on all cluster nodes
+
+- name: Provision buildkite-agent user
+  hosts: all_cluster_nodes
+  gather_facts: yes
+  roles:
+    - buildkite-agent-user
+
+  post_tasks:
+    - name: Verify user across all nodes
+      command: id buildkite-agent
+      register: user_verify
+      changed_when: false
+
+    - name: User verification results
+      debug:
+        msg: "{{ inventory_hostname }}: {{ user_verify.stdout }}"

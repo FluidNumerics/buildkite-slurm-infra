@@ -1,0 +1,114 @@
+---
+# Buildkite Agent Configuration
+
+# =============================================================================
+# Required Variables - MUST BE SET
+# =============================================================================
+
+# Buildkite agent token from Organization Settings > Agents
+# Get this from: https://buildkite.com/organizations/[your-org]/agents
+buildkite_agent_token: "YOUR_AGENT_TOKEN_HERE"
+
+# Slurm cluster name (auto-detected if not set, but recommended to set explicitly)
+buildkite_cluster_name: "galapagos"
+
+# =============================================================================
+# User Configuration
+# =============================================================================
+
+# UID/GID for buildkite-agent user (must be consistent across all nodes)
+buildkite_agent_uid: 998
+buildkite_agent_gid: 996
+
+# User shell and home directory
+buildkite_agent_shell: /bin/bash
+buildkite_agent_home: /var/lib/buildkite-agent
+
+# =============================================================================
+# Slurm Configuration
+# =============================================================================
+
+# Default Slurm account for CI jobs
+slurm_account: "default"
+
+# Optional: Create dedicated CI account
+slurm_create_ci_account: false
+slurm_ci_account_name: "ci-account"
+slurm_ci_account_description: "Buildkite CI Jobs"
+
+# Optional: Resource limits
+slurm_max_jobs: 50
+slurm_max_submit_jobs: 100
+
+# =============================================================================
+# Agent Configuration
+# =============================================================================
+
+# Number of parallel agent instances to spawn
+buildkite_agent_spawn: 1
+
+# Agent name format (uses hostname and spawn number)
+buildkite_agent_name: "%hostname-%spawn"
+
+# Agent priority (higher priorities get work first)
+buildkite_agent_priority: 1
+
+# Build path
+buildkite_build_path: "{{ buildkite_agent_home }}/builds"
+
+# Hooks path
+buildkite_hooks_path: "/etc/buildkite-agent/hooks"
+
+# Plugins path
+buildkite_plugins_path: "/etc/buildkite-agent/plugins"
+
+# Additional agent tags (cluster name and slurm=true added automatically)
+buildkite_additional_tags: []
+# Example:
+# buildkite_additional_tags:
+#   - "environment=production"
+#   - "region=us-west"
+
+# Enable host-derived tags
+buildkite_tags_from_host: true
+
+# =============================================================================
+# Hook Configuration
+# =============================================================================
+
+# Deploy custom hooks
+buildkite_deploy_hooks: true
+
+# GPU partition mappings (customize for your cluster)
+buildkite_gpu_partitions:
+  v100:
+    partition: "v100-partition"
+    constraint: "v100"
+    gpus: 1
+  mi210:
+    partition: "mi210-partition"
+    constraint: "mi210"
+    gpus: 1
+  mi300a:
+    partition: "mi300a-partition"
+    constraint: "mi300a"
+    gpus: 1
+
+# Default Slurm job settings
+buildkite_default_time_limit: "01:00:00"
+buildkite_default_nodes: 1
+buildkite_default_ntasks: 1
+
+# =============================================================================
+# Installation Options
+# =============================================================================
+
+# OS detection (auto-detected, but can override)
+# Options: "debian" or "redhat"
+# buildkite_agent_os_family: "redhat"
+
+# Whether to start agent immediately after install
+buildkite_agent_start_immediately: true
+
+# Whether to enable agent on boot
+buildkite_agent_enable_on_boot: true

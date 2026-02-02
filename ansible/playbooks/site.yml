@@ -1,0 +1,44 @@
+---
+# Main playbook - deploys complete Buildkite infrastructure
+
+- name: Deploy Buildkite Agent Infrastructure
+  hosts: all
+  gather_facts: yes
+  tasks:
+    - name: Display deployment summary
+      debug:
+        msg:
+          - "Deploying Buildkite infrastructure"
+          - "Cluster: {{ buildkite_cluster_name }}"
+          - "Agent UID: {{ buildkite_agent_uid }}"
+          - "Agent GID: {{ buildkite_agent_gid }}"
+
+- name: Provision buildkite-agent user on all nodes
+  import_playbook: provision-user.yml
+
+- name: Install Buildkite agent on login nodes
+  import_playbook: install-agent.yml
+
+- name: Configure Slurm accounting
+  import_playbook: configure-slurm.yml
+
+- name: Deployment complete
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Display next steps
+      debug:
+        msg:
+          - "=== Buildkite Deployment Complete ==="
+          - ""
+          - "Next steps:"
+          - "1. Verify agents are running:"
+          - "   ansible -i inventories/production.ini login_nodes -a 'systemctl status buildkite-agent'"
+          - ""
+          - "2. Check agent registration in Buildkite UI:"
+          - "   Organization Settings → Agents"
+          - ""
+          - "3. Create your first pipeline:"
+          - "   Copy .buildkite/pipeline.yml to your project"
+          - ""
+          - "4. Trigger a test build!"

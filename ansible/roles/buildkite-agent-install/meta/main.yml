@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  author: Fluid Numerics
+  description: Install and configure Buildkite agent
+  company: Fluid Numerics
+  license: 3-Clause BSD
+  min_ansible_version: 2.9
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: EL
+      versions:
+        - 8
+        - 9
+  galaxy_tags:
+    - buildkite
+    - ci
+
+dependencies:
+  - role: buildkite-agent-user

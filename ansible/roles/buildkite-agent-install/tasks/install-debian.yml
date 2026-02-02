@@ -1,0 +1,33 @@
+---
+# Install Buildkite agent on Debian/Ubuntu
+
+- name: Install required packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Add Buildkite GPG key
+  apt_key:
+    url: https://keys.openpgp.org/vks/v1/by-fingerprint/32A37959C2FA5C3C99EFBC32A79206696452D198
+    state: present
+  become: yes
+
+- name: Add Buildkite repository
+  apt_repository:
+    repo: "deb https://apt.buildkite.com/buildkite-agent stable main"
+    state: present
+    filename: buildkite-agent
+  become: yes
+
+- name: Install buildkite-agent
+  apt:
+    name: buildkite-agent
+    state: present
+    update_cache: yes
+  become: yes

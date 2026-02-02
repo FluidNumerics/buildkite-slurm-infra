@@ -1,0 +1,40 @@
+---
+# Create buildkite-agent user on all cluster nodes
+
+- name: Create buildkite-agent group
+  group:
+    name: buildkite-agent
+    gid: "{{ buildkite_agent_gid }}"
+    state: present
+  become: yes
+
+- name: Create buildkite-agent user
+  user:
+    name: buildkite-agent
+    uid: "{{ buildkite_agent_uid }}"
+    group: buildkite-agent
+    home: "{{ buildkite_agent_home }}"
+    shell: "{{ buildkite_agent_shell }}"
+    comment: "Buildkite CI Agent"
+    create_home: yes
+    system: yes
+    state: present
+  become: yes
+
+- name: Ensure buildkite-agent home directory has correct permissions
+  file:
+    path: "{{ buildkite_agent_home }}"
+    state: directory
+    owner: buildkite-agent
+    group: buildkite-agent
+    mode: '0755'
+  become: yes
+
+- name: Verify user creation
+  command: id buildkite-agent
+  register: user_check
+  changed_when: false
+
+- name: Display user info
+  debug:
+    msg: "buildkite-agent user created: {{ user_check.stdout }}"

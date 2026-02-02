@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  author: Your Name
+  description: Create buildkite-agent user with consistent UID/GID
+  company: Your Company
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: EL
+      versions:
+        - 8
+        - 9
+  galaxy_tags:
+    - buildkite
+    - ci
+    - slurm
+
+dependencies: []

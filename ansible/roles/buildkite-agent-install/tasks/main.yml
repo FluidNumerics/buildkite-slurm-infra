@@ -1,0 +1,60 @@
+---
+# Install Buildkite agent on login nodes
+
+- name: Detect OS family
+  set_fact:
+    detected_os_family: "{{ ansible_os_family | lower }}"
+
+- name: Set OS family
+  set_fact:
+    os_family: "{{ buildkite_agent_os_family | default(detected_os_family) }}"
+
+- name: Include OS-specific installation tasks
+  include_tasks: "install-{{ os_family }}.yml"
+
+- name: Ensure buildkite-agent config directory exists
+  file:
+    path: /etc/buildkite-agent
+    state: directory
+    owner: buildkite-agent
+    group: buildkite-agent
+    mode: '0755'
+  become: yes
+
+- name: Configure buildkite-agent
+  template:
+    src: buildkite-agent.cfg.j2
+    dest: /etc/buildkite-agent/buildkite-agent.cfg
+    owner: buildkite-agent
+    group: buildkite-agent
+    mode: '0600'
+  become: yes
+  notify: restart buildkite-agent
+
+- name: Create hooks directory
+  file:
+    path: "{{ buildkite_hooks_path }}"
+    state: directory
+    owner: buildkite-agent
+    group: buildkite-agent
+    mode: '0755'
+  become: yes
+  when: buildkite_deploy_hooks
+
+- name: Deploy hooks
+  include_tasks: deploy-hooks.yml
+  when: buildkite_deploy_hooks
+
+- name: Ensure buildkite-agent service is enabled
+  systemd:
+    name: buildkite-agent
+    enabled: "{{ buildkite_agent_enable_on_boot }}"
+    daemon_reload: yes
+  become: yes
+
+- name: Start buildkite-agent service
+  systemd:
+    name: buildkite-agent
+    state: started
+  become: yes
+  when: buildkite_agent_start_immediately

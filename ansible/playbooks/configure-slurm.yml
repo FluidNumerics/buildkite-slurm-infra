@@ -1,0 +1,19 @@
+---
+# Configure Slurm accounting for buildkite-agent user
+
+- name: Configure Slurm for Buildkite
+  hosts: slurm_controllers
+  gather_facts: yes
+  roles:
+    - buildkite-slurm-setup
+
+  post_tasks:
+    - name: Test job submission
+      command: sudo -u buildkite-agent sbatch --wrap="hostname"
+      register: test_job
+      changed_when: false
+      failed_when: false
+
+    - name: Display test result
+      debug:
+        msg: "Test job submission {{ 'succeeded' if test_job.rc == 0 else 'failed' }}: {{ test_job.stdout if test_job.rc == 0 else test_job.stderr }}"

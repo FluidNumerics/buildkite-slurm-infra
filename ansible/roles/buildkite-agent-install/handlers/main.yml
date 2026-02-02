@@ -1,0 +1,7 @@
+---
+- name: restart buildkite-agent
+  systemd:
+    name: buildkite-agent
+    state: restarted
+    daemon_reload: yes
+  become: yes
