@@ -7,18 +7,18 @@
 
 # Buildkite agent token from Organization Settings > Agents
 # Get this from: https://buildkite.com/organizations/[your-org]/agents
-buildkite_agent_token: "YOUR_AGENT_TOKEN_HERE"
+buildkite_agent_token: ""
 
 # Slurm cluster name (auto-detected if not set, but recommended to set explicitly)
-buildkite_cluster_name: "galapagos"
+#buildkite_cluster_name: ""
 
 # =============================================================================
 # User Configuration
 # =============================================================================
 
 # UID/GID for buildkite-agent user (must be consistent across all nodes)
-buildkite_agent_uid: 998
-buildkite_agent_gid: 996
+buildkite_agent_uid: 941
+buildkite_agent_gid: 940
 
 # User shell and home directory
 buildkite_agent_shell: /bin/bash
@@ -28,11 +28,13 @@ buildkite_agent_home: /var/lib/buildkite-agent
 # Slurm Configuration
 # =============================================================================
 
+sacctmgr: "/usr/local/bin/sacctmgr"
+
 # Default Slurm account for CI jobs
 slurm_account: "default"
 
 # Optional: Create dedicated CI account
-slurm_create_ci_account: false
+slurm_create_ci_account: true
 slurm_ci_account_name: "ci-account"
 slurm_ci_account_description: "Buildkite CI Jobs"
 
@@ -78,21 +80,6 @@ buildkite_tags_from_host: true
 
 # Deploy custom hooks
 buildkite_deploy_hooks: true
-
-# GPU partition mappings (customize for your cluster)
-buildkite_gpu_partitions:
-  v100:
-    partition: "v100-partition"
-    constraint: "v100"
-    gpus: 1
-  mi210:
-    partition: "mi210-partition"
-    constraint: "mi210"
-    gpus: 1
-  mi300a:
-    partition: "mi300a-partition"
-    constraint: "mi300a"
-    gpus: 1
 
 # Default Slurm job settings
 buildkite_default_time_limit: "01:00:00"
