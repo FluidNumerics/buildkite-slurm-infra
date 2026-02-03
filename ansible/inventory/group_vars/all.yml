@@ -22,7 +22,7 @@ buildkite_agent_gid: 940
 
 # User shell and home directory
 buildkite_agent_shell: /bin/bash
-buildkite_agent_home: /var/lib/buildkite-agent
+buildkite_agent_home: /home/buildkite-agent
 
 # =============================================================================
 # Slurm Configuration
