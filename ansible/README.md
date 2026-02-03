@@ -6,26 +6,27 @@ Ansible playbooks and roles for deploying Buildkite agents on Slurm clusters.
 
 1. **Configure your inventory:**
    ```bash
-   cp inventories/example.ini inventories/production.ini
+   cp inventory/example.ini inventory/production.ini
    # Edit with your cluster details
-   vi inventories/production.ini
+   vi inventory/production.ini
    ```
 
 2. **Set variables:**
    ```bash
-   vi group_vars/all.yml
+   cp inventory/group_vars/all.yml.example inventory/group_vars/all.yml
+   vi inventory/group_vars/all.yml
    # Set your Buildkite agent token and cluster settings
    ```
 
 3. **Deploy:**
    ```bash
    # Deploy everything
-   ansible-playbook -i inventories/production.ini playbooks/site.yml
+   ansible-playbook -i inventory/production.ini playbooks/site.yml
 
    # Or deploy step-by-step:
-   ansible-playbook -i inventories/production.ini playbooks/provision-user.yml
-   ansible-playbook -i inventories/production.ini playbooks/install-agent.yml
-   ansible-playbook -i inventories/production.ini playbooks/configure-slurm.yml
+   ansible-playbook -i inventory/production.ini playbooks/provision-user.yml
+   ansible-playbook -i inventory/production.ini playbooks/install-agent.yml
+   ansible-playbook -i inventory/production.ini playbooks/configure-slurm.yml
    ```
 
 ## What Gets Deployed
@@ -39,19 +40,20 @@ Ansible playbooks and roles for deploying Buildkite agents on Slurm clusters.
 
 ```
 .
-├── inventories/
-│   └── example.ini           # Example inventory file
-├── group_vars/
-│   └── all.yml              # Global variables
+├── inventory/
+│   ├── example.ini              # Example inventory file
+│   └── group_vars/
+│       ├── all.yml              # Your configuration (gitignored)
+│       └── all.yml.example      # Example configuration
 ├── roles/
-│   ├── buildkite-agent-user/      # Create user on all nodes
-│   ├── buildkite-agent-install/   # Install agent on login nodes
-│   └── buildkite-slurm-setup/     # Configure Slurm accounting
+│   ├── buildkite-agent-user/    # Create user on all nodes
+│   ├── buildkite-agent-install/ # Install agent on login nodes
+│   └── buildkite-slurm-setup/   # Configure Slurm accounting
 └── playbooks/
-    ├── site.yml             # Main playbook (runs all)
-    ├── provision-user.yml   # Just user provisioning
-    ├── install-agent.yml    # Just agent installation
-    └── configure-slurm.yml  # Just Slurm configuration
+    ├── site.yml                 # Main playbook (runs all)
+    ├── provision-user.yml       # User provisioning
+    ├── install-agent.yml        # Agent installation
+    └── configure-slurm.yml      # Slurm configuration
 ```
 
 ## Requirements
@@ -63,26 +65,42 @@ Ansible playbooks and roles for deploying Buildkite agents on Slurm clusters.
 
 ## Variables
 
-Edit `group_vars/all.yml`:
+Edit `inventory/group_vars/all.yml` (copy from `all.yml.example` first):
 
 ```yaml
+# Required
 buildkite_agent_token: "your-agent-token-here"
-buildkite_cluster_name: "galapagos"
+buildkite_cluster_name: "your-cluster-name"
+
+# User configuration
 buildkite_agent_uid: 998
 buildkite_agent_gid: 996
+buildkite_agent_home: /home/buildkite-agent
+
+# Slurm configuration
+sacctmgr: "/usr/local/bin/sacctmgr"
 slurm_account: "default"
+slurm_create_ci_account: true
+slurm_ci_account_name: "ci-account"
+
+# Agent configuration
+buildkite_agent_spawn: 1
+buildkite_build_path: "{{ buildkite_agent_home }}/builds"
+buildkite_hooks_path: "/etc/buildkite-agent/hooks"
 ```
+
+See `inventory/group_vars/all.yml.example` for the full list of available variables.
 
 ## Testing
 
 Test connectivity first:
 ```bash
-ansible -i inventories/production.ini all -m ping
+ansible -i inventory/production.ini all -m ping
 ```
 
 Test in check mode (dry-run):
 ```bash
-ansible-playbook -i inventories/production.ini playbooks/site.yml --check
+ansible-playbook -i inventory/production.ini playbooks/site.yml --check
 ```
 
 ## Customization
@@ -92,18 +110,23 @@ ansible-playbook -i inventories/production.ini playbooks/site.yml --check
 The roles detect OS automatically (Ubuntu/Debian vs RHEL/Rocky) but you can override:
 
 ```yaml
-# In group_vars/all.yml
+# In inventory/group_vars/all.yml
 buildkite_agent_os_family: "redhat"  # or "debian"
 ```
 
 ### Custom Hooks
 
-Place custom hooks in `roles/buildkite-agent-install/files/hooks/` before running.
+Hooks are deployed from Jinja2 templates in `roles/buildkite-agent-install/templates/hooks/`:
+- `pre-command.j2` - Runs before each command
+- `environment.j2` - Sets up environment variables
+- `pre-exit.j2` - Cleanup after job completion
+
+Edit these templates to customize hook behavior for your cluster.
 
 ### Multiple Agents per Node
 
 ```yaml
-# In group_vars/all.yml
+# In inventory/group_vars/all.yml
 buildkite_agent_spawn: 2
 ```
 
@@ -114,9 +137,9 @@ buildkite_agent_spawn: 2
 If the UIDs conflict:
 ```bash
 # Check existing users
-ansible -i inventories/production.ini all -a "getent passwd 998"
+ansible -i inventory/production.ini all -a "getent passwd 998"
 
-# Change in group_vars/all.yml
+# Change in inventory/group_vars/all.yml
 buildkite_agent_uid: 1998
 buildkite_agent_gid: 1996
 ```
@@ -125,15 +148,16 @@ buildkite_agent_gid: 1996
 
 ```bash
 # Check status on login nodes
-ansible -i inventories/production.ini login_nodes -a "systemctl status buildkite-agent"
+ansible -i inventory/production.ini login_nodes -a "systemctl status buildkite-agent"
 
 # Check logs
-ansible -i inventories/production.ini login_nodes -a "journalctl -u buildkite-agent -n 50"
+ansible -i inventory/production.ini login_nodes -a "journalctl -u buildkite-agent -n 50"
 ```
 
 ### Slurm Database Issues
 
 ```bash
 # Verify user in Slurm
-ansible -i inventories/production.ini slurm_controllers -a "sacctmgr show user buildkite-agent -s"
+ansible -i inventory/production.ini slurm_controllers -a "sacctmgr show user buildkite-agent -s"
 ```
+
