@@ -167,6 +167,14 @@ sudo systemctl start buildkite-agent@1
 sudo systemctl start buildkite-agent@2
 ```
 
+
+## Giving your agent an ssh key
+The `buildkite-agent`, needs to have an ssh key associated with its posix account and that ssh key needs to be aligned with an account on github that has read permissions to your repository. An ed25519 ssh key for the `buildkit-agent` is created with the provided ansible scripts. You can get the public key by running
+
+```
+sudo cat /var/lib/buildkite-agent/.ssh/id_ed25519.pub
+```
 ## Troubleshooting
 
 See [troubleshooting.md](troubleshooting.md) for common issues.
+

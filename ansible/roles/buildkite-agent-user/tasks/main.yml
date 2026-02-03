@@ -19,6 +19,9 @@
     create_home: yes
     system: yes
     state: present
+    generate_ssh_key: yes
+    ssh_key_type: ed25519
+    ssh_key_comment: "buildkit-agent@{{ ansible_hostname }}"
   become: yes
 
 - name: Ensure buildkite-agent home directory has correct permissions
@@ -38,3 +41,19 @@
 - name: Display user info
   debug:
     msg: "buildkite-agent user created: {{ user_check.stdout }}"
+
+- name: Read SSH public key
+  slurp:
+    src: "{{ buildkite_agent_home }}/.ssh/id_ed25519.pub"
+  register: ssh_pubkey
+  become: yes
+  when: inventory_hostname in groups['login_nodes']
+
+- name: Display SSH public key for GitHub/GitLab
+  debug:
+    msg: |
+      Add this deploy key to your repository:
+      {{ ssh_pubkey.content | b64decode }}
+  when: 
+    - inventory_hostname in groups['login_nodes']
+    - ssh_pubkey is defined
