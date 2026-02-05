@@ -78,7 +78,7 @@ buildkite_agent_gid: 996
 buildkite_agent_home: /home/buildkite-agent
 
 # Slurm configuration
-sacctmgr: "/usr/local/bin/sacctmgr"
+slurm_bin: "/usr/local/bin"
 slurm_account: "default"
 slurm_create_ci_account: true
 slurm_ci_account_name: "ci-account"
@@ -117,11 +117,90 @@ buildkite_agent_os_family: "redhat"  # or "debian"
 ### Custom Hooks
 
 Hooks are deployed from Jinja2 templates in `roles/buildkite-agent-install/templates/hooks/`:
-- `pre-command.j2` - Runs before each command
+- `pre-command.j2` - Wraps commands with srun based on agent metadata
 - `environment.j2` - Sets up environment variables
 - `pre-exit.j2` - Cleanup after job completion
 
 Edit these templates to customize hook behavior for your cluster.
+
+## Pipeline Configuration
+
+Jobs **must** specify SLURM options via agent metadata. Running directly on the login node is not permitted.
+
+### Basic Example
+
+```yaml
+steps:
+  - label: ":rocket: Build"
+    command: "make build"
+    agents:
+      queue: "your-cluster-name"
+      slurm_ntasks: "1"
+      slurm_time: "00:30:00"
+      slurm_partition: "batch"
+```
+
+### Available SLURM Options
+
+Use `slurm_<option>` format in the agents block. Options map directly to srun arguments:
+
+| Agent Metadata | srun Argument | Example |
+|----------------|---------------|---------|
+| `slurm_ntasks` | `--ntasks` | `"4"` |
+| `slurm_cpus_per_task` | `--cpus-per-task` | `"8"` |
+| `slurm_time` | `--time` | `"01:00:00"` |
+| `slurm_partition` | `--partition` | `"batch"` |
+| `slurm_gpus` | `--gpus` | `"1"` |
+| `slurm_gpus_per_node` | `--gpus-per-node` | `"2"` |
+| `slurm_mem` | `--mem` | `"16G"` |
+| `slurm_nodes` | `--nodes` | `"2"` |
+| `slurm_exclusive` | `--exclusive` | `"true"` |
+| `slurm_container_image` | `--container-image` | `"ubuntu:22.04"` |
+
+Any srun option can be specified using this pattern. See [srun documentation](https://slurm.schedmd.com/srun.html) for all available options.
+
+### GPU Job Example
+
+```yaml
+steps:
+  - label: ":gpu: GPU Training"
+    command: "python train.py"
+    agents:
+      queue: "your-cluster-name"
+      slurm_partition: "gpu"
+      slurm_gpus: "1"
+      slurm_time: "04:00:00"
+      slurm_mem: "32G"
+```
+
+### Container Job Example
+
+When using `slurm_container_image`, the hook automatically mounts the build checkout directory to `/workspace` and sets it as the working directory:
+
+```yaml
+steps:
+  - label: ":docker: Container Build"
+    command: "cmake --build ."
+    agents:
+      queue: "your-cluster-name"
+      slurm_container_image: "nvcr.io/nvidia/cuda:12.0-devel-ubuntu22.04"
+      slurm_ntasks: "1"
+      slurm_time: "01:00:00"
+```
+
+### Multi-node MPI Example
+
+```yaml
+steps:
+  - label: ":computer: MPI Job"
+    command: "mpirun ./my_application"
+    agents:
+      queue: "your-cluster-name"
+      slurm_nodes: "4"
+      slurm_ntasks_per_node: "8"
+      slurm_time: "02:00:00"
+      slurm_partition: "compute"
+```
 
 ### Multiple Agents per Node
 

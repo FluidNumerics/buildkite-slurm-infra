@@ -28,6 +28,9 @@ buildkite_agent_home: /var/lib/buildkite-agent
 # Slurm Configuration
 # =============================================================================
 
+# Path to Slurm binaries (srun, sacctmgr, etc.)
+slurm_bin: "/usr/local/bin"
+
 # Default Slurm account for CI jobs
 slurm_account: "default"
 
@@ -62,7 +65,7 @@ buildkite_hooks_path: "/etc/buildkite-agent/hooks"
 # Plugins path
 buildkite_plugins_path: "/etc/buildkite-agent/plugins"
 
-# Additional agent tags (cluster name and slurm=true added automatically)
+# Additional agent tags (cluster name added automatically as queue=<name>)
 buildkite_additional_tags: []
 # Example:
 # buildkite_additional_tags:
@@ -71,33 +74,6 @@ buildkite_additional_tags: []
 
 # Enable host-derived tags
 buildkite_tags_from_host: true
-
-# =============================================================================
-# Hook Configuration
-# =============================================================================
-
-# Deploy custom hooks
-buildkite_deploy_hooks: true
-
-# GPU partition mappings (customize for your cluster)
-buildkite_gpu_partitions:
-  v100:
-    partition: "v100-partition"
-    constraint: "v100"
-    gpus: 1
-  mi210:
-    partition: "mi210-partition"
-    constraint: "mi210"
-    gpus: 1
-  mi300a:
-    partition: "mi300a-partition"
-    constraint: "mi300a"
-    gpus: 1
-
-# Default Slurm job settings
-buildkite_default_time_limit: "01:00:00"
-buildkite_default_nodes: 1
-buildkite_default_ntasks: 1
 
 # =============================================================================
 # Installation Options
