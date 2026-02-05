@@ -28,7 +28,7 @@ buildkite_agent_home: /home/buildkite-agent
 # Slurm Configuration
 # =============================================================================
 
-sacctmgr: "/usr/local/bin/sacctmgr"
+slurm_bin: "/usr/local/bin"
 
 # Default Slurm account for CI jobs
 slurm_account: "default"

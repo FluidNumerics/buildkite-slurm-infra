@@ -1,3 +1,100 @@
 #!/bin/bash
 
-echo "Nothing to do in pre-command"
+set -euo pipefail
+
+# Function to construct srun command from metadata
+construct_srun_command() {
+    local srun_cmd="{{ slurm_bin }}/srun"
+    local has_slurm_opts=false
+    local has_container_image=false
+    
+    # Iterate through all environment variables
+    for var in $(compgen -e); do
+        if [[ $var == BUILDKITE_AGENT_META_DATA_SLURM_* ]]; then
+            has_slurm_opts=true
+            
+            # Extract the slurm option name
+            local opt_name=${var#BUILDKITE_AGENT_META_DATA_SLURM_}
+            local opt_name_lower=$(echo "$opt_name" | tr '[:upper:]' '[:lower:]')
+            local opt_name_hyphen=$(echo "$opt_name_lower" | tr '_' '-')
+            
+            # Get the value
+            local opt_value="${!var}"
+            
+            # Check if this is a container image
+            if [[ "$opt_name_hyphen" == "container-image" ]]; then
+                has_container_image=true
+            fi
+            
+            # Construct the argument
+            if [[ "$opt_value" == "true" ]]; then
+                srun_cmd="$srun_cmd --$opt_name_hyphen"
+            else
+                srun_cmd="$srun_cmd --$opt_name_hyphen=\"$opt_value\""
+            fi
+        fi
+    done
+    
+    # If container image is provided, automatically add mounts and workdir
+    if [[ "$has_container_image" == "true" ]]; then
+        # Add container mounts (unless already specified)
+        if [[ ! "$srun_cmd" =~ --container-mounts ]]; then
+            srun_cmd="$srun_cmd --container-mounts=\"${BUILDKITE_BUILD_CHECKOUT_PATH}:/workspace\""
+        fi
+        
+        # Add container workdir (unless already specified)
+        if [[ ! "$srun_cmd" =~ --container-workdir ]]; then
+            srun_cmd="$srun_cmd --container-workdir=\"/workspace\""
+        fi
+    fi
+    
+    if [[ "$has_slurm_opts" == "true" ]]; then
+        echo "$srun_cmd"
+    else
+        echo ""
+    fi
+}
+
+# Construct the srun command
+SRUN_CMD=$(construct_srun_command)
+
+if [[ -n "$SRUN_CMD" ]]; then
+    # Export for use in the command
+    export SRUN_CMD
+
+    # Save original command
+    export ORIGINAL_COMMAND="$BUILDKITE_COMMAND"
+
+    # Replace the command with srun-wrapped version
+    export BUILDKITE_COMMAND="$SRUN_CMD bash -c $(printf '%q' "$ORIGINAL_COMMAND")"
+
+    echo "--- :slurm: Wrapping command with srun"
+    echo "$SRUN_CMD"
+else
+    echo "--- :no_entry: SLURM metadata required"
+    echo ""
+    echo "This Buildkite agent runs jobs on a SLURM cluster. Running directly on the"
+    echo "login node is not permitted. You must specify SLURM options via agent metadata."
+    echo ""
+    echo "Add SLURM options to your pipeline step using the 'agents' block:"
+    echo ""
+    echo "  steps:"
+    echo "    - label: \":rocket: My Job\""
+    echo "      command: \"${BUILDKITE_COMMAND}\""
+    echo "      agents:"
+    echo "        slurm_ntasks: \"1\""
+    echo "        slurm_time: \"00:30:00\""
+    echo "        slurm_partition: \"batch\""
+    echo ""
+    echo "Common SLURM options (use slurm_<option> format):"
+    echo "  slurm_ntasks        - Number of tasks (e.g., \"4\")"
+    echo "  slurm_cpus_per_task - CPUs per task (e.g., \"8\")"
+    echo "  slurm_time          - Time limit (e.g., \"01:00:00\")"
+    echo "  slurm_partition     - Partition name (e.g., \"batch\")"
+    echo "  slurm_gpus          - Number of GPUs (e.g., \"1\")"
+    echo "  slurm_mem           - Memory limit (e.g., \"16G\")"
+    echo "  slurm_container_image - Enroot container image"
+    echo ""
+    echo "See: https://slurm.schedmd.com/srun.html for all available options."
+    exit 1
+fi

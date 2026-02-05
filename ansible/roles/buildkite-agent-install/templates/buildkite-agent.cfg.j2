@@ -14,7 +14,7 @@ spawn={{ buildkite_agent_spawn }}
 priority={{ buildkite_agent_priority }}
 
 # Agent tags
-{% set tags = ["queue=" + buildkite_cluster_name, "slurm=true"] + buildkite_additional_tags %}
+{% set tags = ["queue=" + buildkite_cluster_name] + buildkite_additional_tags %}
 tags="{{ tags | join(',') }}"
 
 # Include host metadata as tags
