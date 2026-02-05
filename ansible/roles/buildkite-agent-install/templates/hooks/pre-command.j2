@@ -96,6 +96,7 @@ else
     echo "    - label: \":rocket: My Job\""
     echo "      command: \"${BUILDKITE_COMMAND}\""
     echo "      agents:"
+    echo "        queue: \"{{ buildkite_cluster_name }}\""
     echo "        slurm_ntasks: \"1\""
     echo "        slurm_time: \"00:30:00\""
     echo "        slurm_partition: \"batch\""
