@@ -10,7 +10,7 @@ if [[ "$BUILDKITE_COMMAND" == *"buildkite-agent "* ]]; then
     exit 0
 fi
 
-# Function to construct srun command from metadata
+# Function to construct srun command from slurm_ prefixed env vars
 construct_srun_command() {
     local srun_cmd="{{ slurm_bin }}/srun"
     local has_slurm_opts=false
@@ -18,13 +18,14 @@ construct_srun_command() {
     local user_container_mounts=""
     local user_container_workdir=""
 
-    # Iterate through all environment variables
+    # Iterate through all environment variables looking for slurm_ prefixed vars
+    # set in the pipeline's env block
     for var in $(compgen -e); do
-        if [[ $var == BUILDKITE_AGENT_META_DATA_SLURM_* ]]; then
+        if [[ $var == slurm_* ]]; then
             has_slurm_opts=true
 
-            # Extract the slurm option name
-            local opt_name=${var#BUILDKITE_AGENT_META_DATA_SLURM_}
+            # Strip the slurm_ prefix and convert to srun flag format
+            local opt_name=${var#slurm_}
             local opt_name_lower=$(echo "$opt_name" | tr '[:upper:]' '[:lower:]')
             local opt_name_hyphen=$(echo "$opt_name_lower" | tr '_' '-')
 
@@ -93,21 +94,22 @@ if [[ -n "$SRUN_CMD" ]]; then
     echo "--- :slurm: Wrapping command with srun"
     echo "$SRUN_CMD"
 else
-    echo "--- :no_entry: SLURM metadata required"
+    echo "--- :no_entry: SLURM options required"
     echo ""
     echo "This Buildkite agent runs jobs on a SLURM cluster. Running directly on the"
-    echo "login node is not permitted. You must specify SLURM options via agent metadata."
+    echo "login node is not permitted. You must specify SLURM options via the env block."
     echo ""
-    echo "Add SLURM options to your pipeline step using the 'agents' block:"
+    echo "Add SLURM options to your pipeline step using the 'env' block:"
     echo ""
     echo "  steps:"
     echo "    - label: \":rocket: My Job\""
     echo "      command: \"${BUILDKITE_COMMAND}\""
-    echo "      agents:"
-    echo "        queue: \"{{ buildkite_cluster_name }}\""
+    echo "      env:"
     echo "        slurm_ntasks: \"1\""
     echo "        slurm_time: \"00:30:00\""
     echo "        slurm_partition: \"batch\""
+    echo "      agents:"
+    echo "        queue: \"{{ buildkite_cluster_name }}\""
     echo ""
     echo "Common SLURM options (use slurm_<option> format):"
     echo "  slurm_ntasks        - Number of tasks (e.g., \"4\")"

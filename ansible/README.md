@@ -117,14 +117,14 @@ buildkite_agent_os_family: "redhat"  # or "debian"
 ### Custom Hooks
 
 Hooks are deployed from Jinja2 templates in `roles/buildkite-agent-install/templates/hooks/`:
-- `pre-command.j2` - Wraps commands with srun based on agent metadata (automatically skips `buildkite-agent` subcommands like `pipeline upload`)
+- `pre-command.j2` - Wraps commands with srun based on `slurm_` prefixed env vars (automatically skips `buildkite-agent` subcommands like `pipeline upload`)
 - `environment.j2` - Sets up environment variables
 
 Edit these templates to customize hook behavior for your cluster.
 
 ## Pipeline Configuration
 
-Jobs **must** specify SLURM options via agent metadata. Running directly on the login node is not permitted, with the exception of `buildkite-agent` subcommands (e.g., `pipeline upload`, `artifact upload`) which are automatically detected and allowed to run on the agent node.
+Jobs **must** specify SLURM options via `slurm_` prefixed environment variables in the pipeline `env` block. Running directly on the login node is not permitted, with the exception of `buildkite-agent` subcommands (e.g., `pipeline upload`, `artifact upload`) which are automatically detected and allowed to run on the agent node.
 
 ### Basic Example
 
@@ -132,18 +132,19 @@ Jobs **must** specify SLURM options via agent metadata. Running directly on the 
 steps:
   - label: ":rocket: Build"
     command: "make build"
-    agents:
-      queue: "your-cluster-name"
+    env:
       slurm_ntasks: "1"
       slurm_time: "00:30:00"
       slurm_partition: "batch"
+    agents:
+      queue: "your-cluster-name"
 ```
 
 ### Available SLURM Options
 
-Use `slurm_<option>` format in the agents block. Options map directly to srun arguments:
+Use `slurm_<option>` format in the `env` block. The `slurm_` prefix is stripped and underscores are converted to hyphens to form srun arguments:
 
-| Agent Metadata | srun Argument | Example |
+| Env Variable | srun Argument | Example |
 |----------------|---------------|---------|
 | `slurm_ntasks` | `--ntasks` | `"4"` |
 | `slurm_cpus_per_task` | `--cpus-per-task` | `"8"` |
@@ -164,12 +165,13 @@ Any srun option can be specified using this pattern. See [srun documentation](ht
 steps:
   - label: ":gpu: GPU Training"
     command: "python train.py"
-    agents:
-      queue: "your-cluster-name"
+    env:
       slurm_partition: "gpu"
       slurm_gpus: "1"
       slurm_time: "04:00:00"
       slurm_mem: "32G"
+    agents:
+      queue: "your-cluster-name"
 ```
 
 ### Container Job Example
@@ -180,11 +182,12 @@ When using `slurm_container_image`, the hook automatically mounts the build chec
 steps:
   - label: ":docker: Container Build"
     command: "cmake --build ."
-    agents:
-      queue: "your-cluster-name"
+    env:
       slurm_container_image: "nvcr.io/nvidia/cuda:12.0-devel-ubuntu22.04"
       slurm_ntasks: "1"
       slurm_time: "01:00:00"
+    agents:
+      queue: "your-cluster-name"
 ```
 
 Additional mounts can be specified with `slurm_container_mounts` and will be appended to the default workspace mount:
@@ -193,12 +196,13 @@ Additional mounts can be specified with `slurm_container_mounts` and will be app
 steps:
   - label: ":docker: Container with Extra Mounts"
     command: "./run_analysis.sh"
-    agents:
-      queue: "your-cluster-name"
+    env:
       slurm_container_image: "nvcr.io/nvidia/cuda:12.0-devel-ubuntu22.04"
       slurm_container_mounts: "/scratch:/scratch,/datasets:/data:ro"
       slurm_ntasks: "1"
       slurm_time: "02:00:00"
+    agents:
+      queue: "your-cluster-name"
 ```
 
 This results in mounts: `$BUILDKITE_BUILD_CHECKOUT_PATH:/workspace,/scratch:/scratch,/datasets:/data:ro`
@@ -209,12 +213,13 @@ This results in mounts: `$BUILDKITE_BUILD_CHECKOUT_PATH:/workspace,/scratch:/scr
 steps:
   - label: ":computer: MPI Job"
     command: "mpirun ./my_application"
-    agents:
-      queue: "your-cluster-name"
+    env:
       slurm_nodes: "4"
       slurm_ntasks_per_node: "8"
       slurm_time: "02:00:00"
       slurm_partition: "compute"
+    agents:
+      queue: "your-cluster-name"
 ```
 
 ### Multiple Agents per Node
