@@ -9,7 +9,7 @@ See [ansible/README.md](ansible/README.md) for deployment instructions.
 ## Architecture
 
 - **Agent:** Runs on login/submit nodes, polls Buildkite for jobs
-- **Hooks:** Intercept commands and submit to Slurm via sbatch
+- **Hooks:** Intercept commands and submit to Slurm via srun
 - **Pipeline:** Standard Buildkite YAML in your project repos
 
 ## Repository Structure
