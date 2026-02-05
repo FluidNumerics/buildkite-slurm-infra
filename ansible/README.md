@@ -188,6 +188,22 @@ steps:
       slurm_time: "01:00:00"
 ```
 
+Additional mounts can be specified with `slurm_container_mounts` and will be appended to the default workspace mount:
+
+```yaml
+steps:
+  - label: ":docker: Container with Extra Mounts"
+    command: "./run_analysis.sh"
+    agents:
+      queue: "your-cluster-name"
+      slurm_container_image: "nvcr.io/nvidia/cuda:12.0-devel-ubuntu22.04"
+      slurm_container_mounts: "/scratch:/scratch,/datasets:/data:ro"
+      slurm_ntasks: "1"
+      slurm_time: "02:00:00"
+```
+
+This results in mounts: `$BUILDKITE_BUILD_CHECKOUT_PATH:/workspace,/scratch:/scratch,/datasets:/data:ro`
+
 ### Multi-node MPI Example
 
 ```yaml

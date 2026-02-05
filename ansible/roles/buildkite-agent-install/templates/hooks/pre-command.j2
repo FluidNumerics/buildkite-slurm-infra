@@ -7,25 +7,38 @@ construct_srun_command() {
     local srun_cmd="{{ slurm_bin }}/srun"
     local has_slurm_opts=false
     local has_container_image=false
-    
+    local user_container_mounts=""
+    local user_container_workdir=""
+
     # Iterate through all environment variables
     for var in $(compgen -e); do
         if [[ $var == BUILDKITE_AGENT_META_DATA_SLURM_* ]]; then
             has_slurm_opts=true
-            
+
             # Extract the slurm option name
             local opt_name=${var#BUILDKITE_AGENT_META_DATA_SLURM_}
             local opt_name_lower=$(echo "$opt_name" | tr '[:upper:]' '[:lower:]')
             local opt_name_hyphen=$(echo "$opt_name_lower" | tr '_' '-')
-            
+
             # Get the value
             local opt_value="${!var}"
-            
+
             # Check if this is a container image
             if [[ "$opt_name_hyphen" == "container-image" ]]; then
                 has_container_image=true
             fi
-            
+
+            # Handle container mounts and workdir specially to allow appending
+            if [[ "$opt_name_hyphen" == "container-mounts" ]]; then
+                user_container_mounts="$opt_value"
+                continue
+            fi
+
+            if [[ "$opt_name_hyphen" == "container-workdir" ]]; then
+                user_container_workdir="$opt_value"
+                continue
+            fi
+
             # Construct the argument
             if [[ "$opt_value" == "true" ]]; then
                 srun_cmd="$srun_cmd --$opt_name_hyphen"
@@ -34,20 +47,21 @@ construct_srun_command() {
             fi
         fi
     done
-    
-    # If container image is provided, automatically add mounts and workdir
+
+    # If container image is provided, add default mounts and workdir
     if [[ "$has_container_image" == "true" ]]; then
-        # Add container mounts (unless already specified)
-        if [[ ! "$srun_cmd" =~ --container-mounts ]]; then
-            srun_cmd="$srun_cmd --container-mounts=\"${BUILDKITE_BUILD_CHECKOUT_PATH}:/workspace\""
+        # Build container mounts: default workspace mount + any user-provided mounts
+        local container_mounts="${BUILDKITE_BUILD_CHECKOUT_PATH}:/workspace"
+        if [[ -n "$user_container_mounts" ]]; then
+            container_mounts="${container_mounts},${user_container_mounts}"
         fi
-        
-        # Add container workdir (unless already specified)
-        if [[ ! "$srun_cmd" =~ --container-workdir ]]; then
-            srun_cmd="$srun_cmd --container-workdir=\"/workspace\""
-        fi
+        srun_cmd="$srun_cmd --container-mounts=\"$container_mounts\""
+
+        # Use user-provided workdir or default to /workspace
+        local container_workdir="${user_container_workdir:-/workspace}"
+        srun_cmd="$srun_cmd --container-workdir=\"$container_workdir\""
     fi
-    
+
     if [[ "$has_slurm_opts" == "true" ]]; then
         echo "$srun_cmd"
     else
