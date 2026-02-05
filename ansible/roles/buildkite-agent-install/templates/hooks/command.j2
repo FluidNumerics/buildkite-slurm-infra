@@ -1,0 +1,69 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# For buildkite-agent subcommands, execute directly without srun
+if [[ "$BUILDKITE_COMMAND" == *"buildkite-agent "* ]]; then
+    eval "$BUILDKITE_COMMAND"
+    exit $?
+fi
+
+# Build srun arguments as a bash array to avoid quoting issues
+srun_args=()
+has_container_image=false
+user_container_mounts=""
+user_container_workdir=""
+
+for var in $(compgen -e); do
+    if [[ $var == slurm_* ]]; then
+        # Strip the slurm_ prefix and convert to srun flag format
+        opt_name=${var#slurm_}
+        opt_name_lower=$(echo "$opt_name" | tr '[:upper:]' '[:lower:]')
+        opt_name_hyphen=$(echo "$opt_name_lower" | tr '_' '-')
+
+        # Get the value
+        opt_value="${!var}"
+
+        # Check if this is a container image
+        if [[ "$opt_name_hyphen" == "container-image" ]]; then
+            has_container_image=true
+        fi
+
+        # Handle container mounts and workdir specially to allow appending
+        if [[ "$opt_name_hyphen" == "container-mounts" ]]; then
+            user_container_mounts="$opt_value"
+            continue
+        fi
+
+        if [[ "$opt_name_hyphen" == "container-workdir" ]]; then
+            user_container_workdir="$opt_value"
+            continue
+        fi
+
+        # Construct the argument
+        if [[ "$opt_value" == "true" ]]; then
+            srun_args+=("--$opt_name_hyphen")
+        else
+            srun_args+=("--$opt_name_hyphen=$opt_value")
+        fi
+    fi
+done
+
+# If container image is provided, add default mounts and workdir
+if [[ "$has_container_image" == "true" ]]; then
+    # Build container mounts: default workspace mount + any user-provided mounts
+    container_mounts="${BUILDKITE_BUILD_CHECKOUT_PATH}:/workspace"
+    if [[ -n "$user_container_mounts" ]]; then
+        container_mounts="${container_mounts},${user_container_mounts}"
+    fi
+    srun_args+=("--container-mounts=$container_mounts")
+
+    # Use user-provided workdir or default to /workspace
+    container_workdir="${user_container_workdir:-/workspace}"
+    srun_args+=("--container-workdir=$container_workdir")
+fi
+
+echo "--- :slurm: Running command with srun"
+echo "{{ slurm_bin }}/srun --export=ALL ${srun_args[*]} bash -c \"\$BUILDKITE_COMMAND\""
+
+exec {{ slurm_bin }}/srun --export=ALL "${srun_args[@]}" bash -c "$BUILDKITE_COMMAND"

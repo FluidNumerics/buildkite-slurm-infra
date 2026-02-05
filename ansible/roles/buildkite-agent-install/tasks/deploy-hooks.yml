@@ -11,6 +11,16 @@
   become: yes
   notify: restart buildkite-agent
 
+- name: Deploy command hook
+  template:
+    src: hooks/command.j2
+    dest: "{{ buildkite_hooks_path }}/command"
+    owner: buildkite-agent
+    group: buildkite-agent
+    mode: '0755'
+  become: yes
+  notify: restart buildkite-agent
+
 - name: Deploy environment hook
   template:
     src: hooks/environment.j2
