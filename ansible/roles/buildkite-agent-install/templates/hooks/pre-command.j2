@@ -2,6 +2,14 @@
 
 set -euo pipefail
 
+# Skip srun wrapping for buildkite-agent subcommands (pipeline upload,
+# artifact upload, etc.) — these run on the agent and must not be
+# submitted to SLURM.
+if [[ "$BUILDKITE_COMMAND" == *"buildkite-agent "* ]]; then
+    echo "--- :buildkite: buildkite-agent command detected, skipping srun wrap"
+    exit 0
+fi
+
 # Function to construct srun command from metadata
 construct_srun_command() {
     local srun_cmd="{{ slurm_bin }}/srun"

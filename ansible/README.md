@@ -117,7 +117,7 @@ buildkite_agent_os_family: "redhat"  # or "debian"
 ### Custom Hooks
 
 Hooks are deployed from Jinja2 templates in `roles/buildkite-agent-install/templates/hooks/`:
-- `pre-command.j2` - Wraps commands with srun based on agent metadata
+- `pre-command.j2` - Wraps commands with srun based on agent metadata (automatically skips `buildkite-agent` subcommands like `pipeline upload`)
 - `environment.j2` - Sets up environment variables
 - `pre-exit.j2` - Cleanup after job completion
 
@@ -125,7 +125,7 @@ Edit these templates to customize hook behavior for your cluster.
 
 ## Pipeline Configuration
 
-Jobs **must** specify SLURM options via agent metadata. Running directly on the login node is not permitted.
+Jobs **must** specify SLURM options via agent metadata. Running directly on the login node is not permitted, with the exception of `buildkite-agent` subcommands (e.g., `pipeline upload`, `artifact upload`) which are automatically detected and allowed to run on the agent node.
 
 ### Basic Example
 
