@@ -119,7 +119,6 @@ buildkite_agent_os_family: "redhat"  # or "debian"
 Hooks are deployed from Jinja2 templates in `roles/buildkite-agent-install/templates/hooks/`:
 - `pre-command.j2` - Wraps commands with srun based on agent metadata (automatically skips `buildkite-agent` subcommands like `pipeline upload`)
 - `environment.j2` - Sets up environment variables
-- `pre-exit.j2` - Cleanup after job completion
 
 Edit these templates to customize hook behavior for your cluster.
 
