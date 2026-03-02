@@ -61,6 +61,19 @@ if [[ "$has_container_image" == "true" ]]; then
     # Use user-provided workdir or default to /workspace
     container_workdir="${user_container_workdir:-/workspace}"
     srun_args+=("--container-workdir=$container_workdir")
+
+    # Pyxis/enroot containers do not inherit all host env vars even with --export=ALL.
+    # Explicitly pass all user-defined pipeline variables (non-slurm_, non-BUILDKITE_)
+    # to the container via --container-env so they are available inside the job.
+    container_env_vars=()
+    for var in $(compgen -e); do
+        if [[ $var != slurm_* ]] && [[ $var != BUILDKITE_* ]]; then
+            container_env_vars+=("$var")
+        fi
+    done
+    if [[ ${#container_env_vars[@]} -gt 0 ]]; then
+        srun_args+=("--container-env=$(IFS=,; echo "${container_env_vars[*]}")")
+    fi
 fi
 
 echo "--- :slurm: Running command with srun"
