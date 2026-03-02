@@ -84,6 +84,21 @@ printf '#!/bin/bash\nset -eo pipefail\n' > "$tmpscript"
 printf '%s\n' "$BUILDKITE_COMMAND" >> "$tmpscript"
 
 echo "--- :slurm: Submitting job with sbatch"
-echo "{{ slurm_bin }}/sbatch --wait --export=ALL ${sbatch_args[*]} $tmpscript"
+echo "{{ slurm_bin }}/sbatch --parsable --export=ALL ${sbatch_args[*]} $tmpscript"
 
-{{ slurm_bin }}/sbatch --wait --export=ALL "${sbatch_args[@]}" "$tmpscript"
+job_id=$({{ slurm_bin }}/sbatch --parsable --export=ALL "${sbatch_args[@]}" "$tmpscript")
+echo "Submitted batch job $job_id"
+
+# Cancel the Slurm job if Buildkite cancels this step (SIGTERM) or the hook is interrupted (SIGINT)
+trap '{{ slurm_bin }}/scancel "$job_id"' INT TERM
+
+# Poll until the job leaves the queue (completed, failed, or cancelled)
+while [[ -n "$({{ slurm_bin }}/squeue --job "$job_id" --format="%T" --noheader 2>/dev/null)" ]]; do
+    sleep 5
+done
+
+# Retrieve the batch step exit code via sacct
+exit_code=$({{ slurm_bin }}/sacct --job "${job_id}.batch" \
+    --format=ExitCode --noheader --parsable2 2>/dev/null \
+    | head -1 | cut -d: -f1)
+exit "${exit_code:-0}"
