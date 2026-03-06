@@ -45,6 +45,26 @@
   include_tasks: deploy-hooks.yml
   when: buildkite_deploy_hooks
 
+- name: Collect group info for video and render
+  getent:
+    database: group
+    key: "{{ item }}"
+    fail_key: no
+  loop:
+    - video
+    - render
+  register: gpu_groups
+  become: yes
+
+- name: Add buildkite-agent user to video and render groups if they exist
+  user:
+    name: buildkite-agent
+    groups: "{{ item.item }}"
+    append: yes
+  become: yes
+  loop: "{{ gpu_groups.results }}"
+  when: item.ansible_facts is defined and item.ansible_facts.getent_group is defined
+
 - name: Ensure buildkite-agent service is enabled
   systemd:
     name: buildkite-agent

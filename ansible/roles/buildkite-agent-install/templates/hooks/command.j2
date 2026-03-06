@@ -2,21 +2,21 @@
 
 set -euo pipefail
 
-# For buildkite-agent subcommands, execute directly without srun
+# For buildkite-agent subcommands, execute directly without sbatch
 if [[ "$BUILDKITE_COMMAND" == *"buildkite-agent "* ]]; then
     eval "$BUILDKITE_COMMAND"
     exit $?
 fi
 
-# Build srun arguments as a bash array to avoid quoting issues
-srun_args=()
+# Build sbatch arguments as a bash array to avoid quoting issues
+sbatch_args=()
 has_container_image=false
 user_container_mounts=""
 user_container_workdir=""
 
 for var in $(compgen -e); do
     if [[ $var == slurm_* ]]; then
-        # Strip the slurm_ prefix and convert to srun flag format
+        # Strip the slurm_ prefix and convert to sbatch flag format
         opt_name=${var#slurm_}
         opt_name_lower=$(echo "$opt_name" | tr '[:upper:]' '[:lower:]')
         opt_name_hyphen=$(echo "$opt_name_lower" | tr '_' '-')
@@ -42,9 +42,9 @@ for var in $(compgen -e); do
 
         # Construct the argument
         if [[ "$opt_value" == "true" ]]; then
-            srun_args+=("--$opt_name_hyphen")
+            sbatch_args+=("--$opt_name_hyphen")
         else
-            srun_args+=("--$opt_name_hyphen=$opt_value")
+            sbatch_args+=("--$opt_name_hyphen=$opt_value")
         fi
     fi
 done
@@ -56,14 +56,49 @@ if [[ "$has_container_image" == "true" ]]; then
     if [[ -n "$user_container_mounts" ]]; then
         container_mounts="${container_mounts},${user_container_mounts}"
     fi
-    srun_args+=("--container-mounts=$container_mounts")
+    sbatch_args+=("--container-mounts=$container_mounts")
 
     # Use user-provided workdir or default to /workspace
     container_workdir="${user_container_workdir:-/workspace}"
-    srun_args+=("--container-workdir=$container_workdir")
+    sbatch_args+=("--container-workdir=$container_workdir")
+
+    # Pyxis/enroot containers do not inherit all host env vars even with --export=ALL.
+    # Explicitly pass all user-defined pipeline variables (non-slurm_, non-BUILDKITE_)
+    # to the container via --container-env so they are available inside the job.
+    container_env_vars=()
+    for var in $(compgen -e); do
+        if [[ $var != slurm_* ]] && [[ $var != BUILDKITE_* ]]; then
+            container_env_vars+=("$var")
+        fi
+    done
+    if [[ ${#container_env_vars[@]} -gt 0 ]]; then
+        sbatch_args+=("--container-env=$(IFS=,; echo "${container_env_vars[*]}")")
+    fi
 fi
 
-echo "--- :slurm: Running command with srun"
-echo "{{ slurm_bin }}/srun --export=ALL ${srun_args[*]} bash -c \"\$BUILDKITE_COMMAND\""
+# Write BUILDKITE_COMMAND to a temporary batch script
+tmpscript=$(mktemp /tmp/buildkite-sbatch-XXXXXX.sh)
+trap 'rm -f "$tmpscript"' EXIT
 
-exec {{ slurm_bin }}/srun --export=ALL "${srun_args[@]}" bash -e -c "$BUILDKITE_COMMAND"
+printf '#!/bin/bash\nset -eo pipefail\n' > "$tmpscript"
+printf '%s\n' "$BUILDKITE_COMMAND" >> "$tmpscript"
+
+echo "--- :slurm: Submitting job with sbatch"
+echo "{{ slurm_bin }}/sbatch --parsable --export=ALL ${sbatch_args[*]} $tmpscript"
+
+job_id=$({{ slurm_bin }}/sbatch --parsable --export=ALL "${sbatch_args[@]}" "$tmpscript")
+echo "Submitted batch job $job_id"
+
+# Cancel the Slurm job if Buildkite cancels this step (SIGTERM) or the hook is interrupted (SIGINT)
+trap '{{ slurm_bin }}/scancel "$job_id"' INT TERM
+
+# Poll until the job leaves the queue (completed, failed, or cancelled)
+while [[ -n "$({{ slurm_bin }}/squeue --job "$job_id" --format="%T" --noheader 2>/dev/null)" ]]; do
+    sleep 5
+done
+
+# Retrieve the batch step exit code via sacct
+exit_code=$({{ slurm_bin }}/sacct --job "${job_id}.batch" \
+    --format=ExitCode --noheader --parsable2 2>/dev/null \
+    | head -1 | cut -d: -f1)
+exit "${exit_code:-0}"
