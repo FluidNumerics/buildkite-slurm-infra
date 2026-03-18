@@ -29,6 +29,11 @@ for var in $(compgen -e); do
             has_container_image=true
         fi
 
+        # Output/error are always set to tmplog for Buildkite log streaming
+        if [[ "$opt_name_hyphen" == "output" ]] || [[ "$opt_name_hyphen" == "error" ]]; then
+            continue
+        fi
+
         # Handle container mounts and workdir specially to allow appending
         if [[ "$opt_name_hyphen" == "container-mounts" ]]; then
             user_container_mounts="$opt_value"
@@ -63,12 +68,12 @@ if [[ "$has_container_image" == "true" ]]; then
     sbatch_args+=("--container-workdir=$container_workdir")
 
     # Pyxis/enroot containers do not inherit all host env vars even with --export=ALL.
-    # Explicitly pass all user-defined pipeline variables (non-slurm_, non-BUILDKITE_)
-    # to the container via --container-env so they are available inside the job.
+    # Pass VAR=value pairs explicitly so Pyxis sets them without relying on the
+    # --export=ALL chain reaching the container layer.
     container_env_vars=()
     for var in $(compgen -e); do
         if [[ $var != slurm_* ]] && [[ $var != BUILDKITE_* ]]; then
-            container_env_vars+=("$var")
+            container_env_vars+=("$var=${!var}")
         fi
     done
     if [[ ${#container_env_vars[@]} -gt 0 ]]; then
@@ -78,7 +83,13 @@ fi
 
 # Write BUILDKITE_COMMAND to a temporary batch script
 tmpscript=$(mktemp /tmp/buildkite-sbatch-XXXXXX.sh)
-trap 'rm -f "$tmpscript"' EXIT
+# Use a shared filesystem path so the compute node and agent node write/read the same file
+tmplog=$(mktemp "{{ buildkite_slurm_log_dir | default(buildkite_build_path, true) }}/.buildkite-sbatch-XXXXXX.log")
+trap 'rm -f "$tmpscript" "$tmplog"' EXIT
+
+# Always stream job output/error to tmplog so it can be tailed into Buildkite logs.
+# Any slurm_output / slurm_error env vars are intentionally ignored here.
+sbatch_args+=("--output=$tmplog" "--error=$tmplog")
 
 printf '#!/bin/bash\nset -eo pipefail\n' > "$tmpscript"
 printf '%s\n' "$BUILDKITE_COMMAND" >> "$tmpscript"
@@ -89,13 +100,21 @@ echo "{{ slurm_bin }}/sbatch --parsable --export=ALL ${sbatch_args[*]} $tmpscrip
 job_id=$({{ slurm_bin }}/sbatch --parsable --export=ALL "${sbatch_args[@]}" "$tmpscript")
 echo "Submitted batch job $job_id"
 
-# Cancel the Slurm job if Buildkite cancels this step (SIGTERM) or the hook is interrupted (SIGINT)
-trap '{{ slurm_bin }}/scancel "$job_id"' INT TERM
+# Stream job output to the Buildkite log in the background
+tail -f "$tmplog" &
+tail_pid=$!
+
+# Cancel the Slurm job and stop log streaming if Buildkite cancels this step (SIGTERM/SIGINT)
+trap '{{ slurm_bin }}/scancel "$job_id"; kill "$tail_pid" 2>/dev/null' INT TERM
 
 # Poll until the job leaves the queue (completed, failed, or cancelled)
 while [[ -n "$({{ slurm_bin }}/squeue --job "$job_id" --format="%T" --noheader 2>/dev/null)" ]]; do
     sleep 5
 done
+
+# Stop log streaming
+kill "$tail_pid" 2>/dev/null
+wait "$tail_pid" 2>/dev/null || true
 
 # Retrieve the batch step exit code via sacct
 exit_code=$({{ slurm_bin }}/sacct --job "${job_id}.batch" \
