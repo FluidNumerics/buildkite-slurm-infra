@@ -1,0 +1,7 @@
+---
+# Path to a directory that is shared between the Buildkite agent node and all
+# Slurm compute nodes (e.g. an NFS or Lustre mount). The command hook writes
+# the sbatch job log here so it can be tailed back to the Buildkite UI while
+# the job runs. Defaults to buildkite_build_path, which is typically on a
+# shared filesystem in HPC environments.
+buildkite_slurm_log_dir: ""
