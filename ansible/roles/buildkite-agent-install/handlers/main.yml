@@ -5,3 +5,15 @@
     state: restarted
     daemon_reload: yes
   become: yes
+  when: buildkite_agent_service_scope == 'system'
+
+- name: restart buildkite-agent user
+  systemd:
+    name: buildkite-agent
+    scope: user
+    state: restarted
+    daemon_reload: yes
+  become: yes
+  become_user: "{{ buildkite_agent_run_user }}"
+  environment: "{{ bk_user_systemd_env }}"
+  when: buildkite_agent_service_scope == 'user'

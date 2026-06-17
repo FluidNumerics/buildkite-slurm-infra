@@ -1,0 +1,82 @@
+---
+# Run the agent as a `systemctl --user` service under buildkite_agent_run_user.
+# The distro package only ships a system unit, so we install a user unit and
+# enable lingering so it survives logout and starts on boot.
+
+- name: Build the user systemd environment
+  set_fact:
+    bk_user_systemd_env:
+      XDG_RUNTIME_DIR: "/run/user/{{ getent_passwd[buildkite_agent_run_user][1] }}"
+      DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ getent_passwd[buildkite_agent_run_user][1] }}/bus"
+
+- name: Stop and disable the package-provided system service
+  systemd:
+    name: buildkite-agent
+    state: stopped
+    enabled: false
+  become: yes
+  failed_when: false
+
+- name: Enable lingering so the user service survives logout and starts at boot
+  command: "loginctl enable-linger {{ buildkite_agent_run_user }}"
+  args:
+    creates: "/var/lib/systemd/linger/{{ buildkite_agent_run_user }}"
+  become: yes
+
+- name: Wait for the user runtime directory
+  wait_for:
+    path: "/run/user/{{ getent_passwd[buildkite_agent_run_user][1] }}"
+    timeout: 30
+  become: yes
+
+- name: Ensure the user systemd unit directory exists
+  file:
+    path: "{{ buildkite_agent_run_user_home }}/.config/systemd/user"
+    state: directory
+    mode: '0755'
+  become: yes
+  become_user: "{{ buildkite_agent_run_user }}"
+
+- name: Ensure the build path exists
+  file:
+    path: "{{ bk_build_path }}"
+    state: directory
+    mode: '0755'
+  become: yes
+  become_user: "{{ buildkite_agent_run_user }}"
+
+- name: Install the buildkite-agent user systemd unit
+  template:
+    src: buildkite-agent.user.service.j2
+    dest: "{{ buildkite_agent_run_user_home }}/.config/systemd/user/buildkite-agent.service"
+    mode: '0644'
+  become: yes
+  become_user: "{{ buildkite_agent_run_user }}"
+  notify: restart buildkite-agent user
+
+- name: Reload the user systemd daemon
+  systemd:
+    daemon_reload: yes
+    scope: user
+  become: yes
+  become_user: "{{ buildkite_agent_run_user }}"
+  environment: "{{ bk_user_systemd_env }}"
+
+- name: Enable buildkite-agent user service
+  systemd:
+    name: buildkite-agent
+    scope: user
+    enabled: "{{ buildkite_agent_enable_on_boot }}"
+  become: yes
+  become_user: "{{ buildkite_agent_run_user }}"
+  environment: "{{ bk_user_systemd_env }}"
+
+- name: Start buildkite-agent user service
+  systemd:
+    name: buildkite-agent
+    scope: user
+    state: started
+  become: yes
+  become_user: "{{ buildkite_agent_run_user }}"
+  environment: "{{ bk_user_systemd_env }}"
+  when: buildkite_agent_start_immediately

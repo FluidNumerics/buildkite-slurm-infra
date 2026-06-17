@@ -4,29 +4,38 @@
 - name: Deploy pre-command hook
   template:
     src: hooks/pre-command.j2
-    dest: "{{ buildkite_hooks_path }}/pre-command"
-    owner: buildkite-agent
-    group: buildkite-agent
+    dest: "{{ bk_hooks_path }}/pre-command"
+    owner: "{{ bk_service_user if buildkite_agent_service_scope == 'system' else omit }}"
+    group: "{{ bk_service_user if buildkite_agent_service_scope == 'system' else omit }}"
     mode: '0755'
   become: yes
-  notify: restart buildkite-agent
+  become_user: "{{ omit if buildkite_agent_service_scope == 'system' else buildkite_agent_run_user }}"
+  notify:
+    - restart buildkite-agent
+    - restart buildkite-agent user
 
 - name: Deploy command hook
   template:
     src: hooks/command.j2
-    dest: "{{ buildkite_hooks_path }}/command"
-    owner: buildkite-agent
-    group: buildkite-agent
+    dest: "{{ bk_hooks_path }}/command"
+    owner: "{{ bk_service_user if buildkite_agent_service_scope == 'system' else omit }}"
+    group: "{{ bk_service_user if buildkite_agent_service_scope == 'system' else omit }}"
     mode: '0755'
   become: yes
-  notify: restart buildkite-agent
+  become_user: "{{ omit if buildkite_agent_service_scope == 'system' else buildkite_agent_run_user }}"
+  notify:
+    - restart buildkite-agent
+    - restart buildkite-agent user
 
 - name: Deploy environment hook
   template:
     src: hooks/environment.j2
-    dest: "{{ buildkite_hooks_path }}/environment"
-    owner: buildkite-agent
-    group: buildkite-agent
+    dest: "{{ bk_hooks_path }}/environment"
+    owner: "{{ bk_service_user if buildkite_agent_service_scope == 'system' else omit }}"
+    group: "{{ bk_service_user if buildkite_agent_service_scope == 'system' else omit }}"
     mode: '0755'
   become: yes
-  notify: restart buildkite-agent
+  become_user: "{{ omit if buildkite_agent_service_scope == 'system' else buildkite_agent_run_user }}"
+  notify:
+    - restart buildkite-agent
+    - restart buildkite-agent user
