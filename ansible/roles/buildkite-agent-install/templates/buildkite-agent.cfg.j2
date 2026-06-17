@@ -21,13 +21,13 @@ tags="{{ tags | join(',') }}"
 tags-from-host={{ buildkite_tags_from_host | lower }}
 
 # Build path
-build-path="{{ buildkite_build_path }}"
+build-path="{{ bk_build_path }}"
 
 # Hooks path
-hooks-path="{{ buildkite_hooks_path }}"
+hooks-path="{{ bk_hooks_path }}"
 
 # Plugins path
-plugins-path="{{ buildkite_plugins_path }}"
+plugins-path="{{ bk_plugins_path }}"
 
 # Git configuration
 git-clone-flags="-v"

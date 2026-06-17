@@ -114,6 +114,43 @@ The roles detect OS automatically (Ubuntu/Debian vs RHEL/Rocky) but you can over
 buildkite_agent_os_family: "redhat"  # or "debian"
 ```
 
+### Service Scope: system vs. `systemd --user`
+
+By default the agent runs as the root-owned `buildkite-agent.service` shipped by
+the distro package. You can instead run it as a per-user service managed with
+`systemctl --user`, under an ordinary login account:
+
+```yaml
+# In inventory/group_vars/all.yml
+buildkite_agent_service_scope: user
+buildkite_agent_run_user: "ci-runner"   # must already exist
+```
+
+What changes in `user` scope:
+
+- Config moves to `~/.config/buildkite-agent/buildkite-agent.cfg`, hooks/plugins
+  to `~/.config/buildkite-agent/`, and builds to `~/builds` (all overridable via
+  `buildkite_user_build_path` / `buildkite_user_hooks_path` /
+  `buildkite_user_plugins_path`).
+- A user unit is installed at `~/.config/systemd/user/buildkite-agent.service`.
+- Lingering is enabled (`loginctl enable-linger`) so the agent keeps running
+  after logout and starts on boot. The package's system service is stopped and
+  disabled to avoid two agents.
+
+Manage it as the run user:
+
+```bash
+systemctl --user status buildkite-agent
+journalctl --user-unit buildkite-agent -n 50
+```
+
+> **Note:** Installing the `buildkite-agent` package and adding the run user to
+> the `video`/`render` groups still require root, so deployment uses sudo even in
+> user scope. The run user is responsible for its own Git SSH credentials and
+> Slurm access — the `buildkite-agent` system user provisioning and Slurm
+> accounting tasks are oriented toward system scope. If your jobs submit to Slurm
+> as the run user, make sure that account has the necessary Slurm associations.
+
 ### Custom Hooks
 
 Hooks are deployed from Jinja2 templates in `roles/buildkite-agent-install/templates/hooks/`:

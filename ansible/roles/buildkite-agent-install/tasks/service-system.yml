@@ -1,0 +1,16 @@
+---
+# Manage the root-owned buildkite-agent systemd unit shipped by the package.
+
+- name: Ensure buildkite-agent service is enabled
+  systemd:
+    name: buildkite-agent
+    enabled: "{{ buildkite_agent_enable_on_boot }}"
+    daemon_reload: yes
+  become: yes
+
+- name: Start buildkite-agent service
+  systemd:
+    name: buildkite-agent
+    state: started
+  become: yes
+  when: buildkite_agent_start_immediately

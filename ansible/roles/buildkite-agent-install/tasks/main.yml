@@ -9,36 +9,94 @@
   set_fact:
     os_family: "{{ buildkite_agent_os_family | default(detected_os_family) }}"
 
+# -----------------------------------------------------------------------------
+# Resolve the effective service identity and paths for the selected scope.
+# In "system" scope these mirror the original /etc + buildkite-agent values, so
+# behavior is unchanged. In "user" scope everything moves under the run user's
+# home directory.
+# -----------------------------------------------------------------------------
+
+- name: Validate run user is set for user-scope service
+  assert:
+    that:
+      - buildkite_agent_run_user | length > 0
+    fail_msg: >-
+      buildkite_agent_run_user must be set to an existing login account when
+      buildkite_agent_service_scope is 'user'.
+  when: buildkite_agent_service_scope == 'user'
+
+- name: Look up run user account details
+  getent:
+    database: passwd
+    key: "{{ buildkite_agent_run_user }}"
+  become: yes
+  when: buildkite_agent_service_scope == 'user'
+
+- name: Resolve run user home directory
+  set_fact:
+    buildkite_agent_run_user_home: >-
+      {{ buildkite_agent_run_user_home if buildkite_agent_run_user_home | length > 0
+         else getent_passwd[buildkite_agent_run_user][4] }}
+  when: buildkite_agent_service_scope == 'user'
+
+- name: Resolve effective service identity and config directory
+  set_fact:
+    bk_service_user: "{{ 'buildkite-agent' if buildkite_agent_service_scope == 'system' else buildkite_agent_run_user }}"
+    bk_config_dir: "{{ '/etc/buildkite-agent' if buildkite_agent_service_scope == 'system' else buildkite_agent_run_user_home ~ '/.config/buildkite-agent' }}"
+
+- name: Resolve effective agent paths
+  set_fact:
+    bk_hooks_path: >-
+      {{ buildkite_hooks_path if buildkite_agent_service_scope == 'system'
+         else (buildkite_user_hooks_path if buildkite_user_hooks_path | length > 0 else bk_config_dir ~ '/hooks') }}
+    bk_plugins_path: >-
+      {{ buildkite_plugins_path if buildkite_agent_service_scope == 'system'
+         else (buildkite_user_plugins_path if buildkite_user_plugins_path | length > 0 else bk_config_dir ~ '/plugins') }}
+    bk_build_path: >-
+      {{ buildkite_build_path if buildkite_agent_service_scope == 'system'
+         else (buildkite_user_build_path if buildkite_user_build_path | length > 0 else buildkite_agent_run_user_home ~ '/builds') }}
+
 - name: Include OS-specific installation tasks
   include_tasks: "install-{{ os_family }}.yml"
 
+# -----------------------------------------------------------------------------
+# Config + hooks deployment (shared between scopes). In system scope files are
+# created as root and owned by buildkite-agent; in user scope they are created
+# as the run user (ownership defaults to that account).
+# -----------------------------------------------------------------------------
+
 - name: Ensure buildkite-agent config directory exists
   file:
-    path: /etc/buildkite-agent
+    path: "{{ bk_config_dir }}"
     state: directory
-    owner: buildkite-agent
-    group: buildkite-agent
+    owner: "{{ bk_service_user if buildkite_agent_service_scope == 'system' else omit }}"
+    group: "{{ bk_service_user if buildkite_agent_service_scope == 'system' else omit }}"
     mode: '0755'
   become: yes
+  become_user: "{{ omit if buildkite_agent_service_scope == 'system' else buildkite_agent_run_user }}"
 
 - name: Configure buildkite-agent
   template:
     src: buildkite-agent.cfg.j2
-    dest: /etc/buildkite-agent/buildkite-agent.cfg
-    owner: buildkite-agent
-    group: buildkite-agent
+    dest: "{{ bk_config_dir }}/buildkite-agent.cfg"
+    owner: "{{ bk_service_user if buildkite_agent_service_scope == 'system' else omit }}"
+    group: "{{ bk_service_user if buildkite_agent_service_scope == 'system' else omit }}"
     mode: '0600'
   become: yes
-  notify: restart buildkite-agent
+  become_user: "{{ omit if buildkite_agent_service_scope == 'system' else buildkite_agent_run_user }}"
+  notify:
+    - restart buildkite-agent
+    - restart buildkite-agent user
 
 - name: Create hooks directory
   file:
-    path: "{{ buildkite_hooks_path }}"
+    path: "{{ bk_hooks_path }}"
     state: directory
-    owner: buildkite-agent
-    group: buildkite-agent
+    owner: "{{ bk_service_user if buildkite_agent_service_scope == 'system' else omit }}"
+    group: "{{ bk_service_user if buildkite_agent_service_scope == 'system' else omit }}"
     mode: '0755'
   become: yes
+  become_user: "{{ omit if buildkite_agent_service_scope == 'system' else buildkite_agent_run_user }}"
   when: buildkite_deploy_hooks
 
 - name: Deploy hooks
@@ -56,25 +114,23 @@
   register: gpu_groups
   become: yes
 
-- name: Add buildkite-agent user to video and render groups if they exist
+- name: Add service user to video and render groups if they exist
   user:
-    name: buildkite-agent
+    name: "{{ bk_service_user }}"
     groups: "{{ item.item }}"
     append: yes
   become: yes
   loop: "{{ gpu_groups.results }}"
   when: item.ansible_facts is defined and item.ansible_facts.getent_group is defined
 
-- name: Ensure buildkite-agent service is enabled
-  systemd:
-    name: buildkite-agent
-    enabled: "{{ buildkite_agent_enable_on_boot }}"
-    daemon_reload: yes
-  become: yes
+# -----------------------------------------------------------------------------
+# Service management (scope-specific)
+# -----------------------------------------------------------------------------
 
-- name: Start buildkite-agent service
-  systemd:
-    name: buildkite-agent
-    state: started
-  become: yes
-  when: buildkite_agent_start_immediately
+- name: Manage system-scope service
+  include_tasks: service-system.yml
+  when: buildkite_agent_service_scope == 'system'
+
+- name: Manage user-scope service
+  include_tasks: service-user.yml
+  when: buildkite_agent_service_scope == 'user'

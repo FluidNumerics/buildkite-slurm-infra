@@ -12,22 +12,58 @@
       wait_for:
         timeout: 10
 
-    - name: Check agent status
+    # --- system scope ---------------------------------------------------------
+    - name: Check agent status (system scope)
       systemd:
         name: buildkite-agent
       register: agent_status
       become: yes
+      when: buildkite_agent_service_scope | default('system') == 'system'
 
-    - name: Display agent status
+    - name: Display agent status (system scope)
       debug:
         msg: "{{ inventory_hostname }}: Agent is {{ agent_status.status.ActiveState }}"
+      when: buildkite_agent_service_scope | default('system') == 'system'
 
-    - name: Get recent agent logs
+    - name: Get recent agent logs (system scope)
       command: journalctl -u buildkite-agent -n 20 --no-pager
       register: agent_logs
       become: yes
       changed_when: false
+      when: buildkite_agent_service_scope | default('system') == 'system'
 
-    - name: Display agent logs
+    - name: Display agent logs (system scope)
       debug:
         msg: "{{ agent_logs.stdout_lines }}"
+      when: buildkite_agent_service_scope | default('system') == 'system'
+
+    # --- user scope -----------------------------------------------------------
+    - name: Check agent status (user scope)
+      command: systemctl --user is-active buildkite-agent
+      register: agent_status_user
+      become: yes
+      become_user: "{{ buildkite_agent_run_user }}"
+      environment: "{{ bk_user_systemd_env }}"
+      changed_when: false
+      failed_when: false
+      when: buildkite_agent_service_scope | default('system') == 'user'
+
+    - name: Display agent status (user scope)
+      debug:
+        msg: "{{ inventory_hostname }}: Agent (user={{ buildkite_agent_run_user }}) is {{ agent_status_user.stdout }}"
+      when: buildkite_agent_service_scope | default('system') == 'user'
+
+    - name: Get recent agent logs (user scope)
+      command: journalctl --user-unit buildkite-agent -n 20 --no-pager
+      register: agent_logs_user
+      become: yes
+      become_user: "{{ buildkite_agent_run_user }}"
+      environment: "{{ bk_user_systemd_env }}"
+      changed_when: false
+      failed_when: false
+      when: buildkite_agent_service_scope | default('system') == 'user'
+
+    - name: Display agent logs (user scope)
+      debug:
+        msg: "{{ agent_logs_user.stdout_lines }}"
+      when: buildkite_agent_service_scope | default('system') == 'user'

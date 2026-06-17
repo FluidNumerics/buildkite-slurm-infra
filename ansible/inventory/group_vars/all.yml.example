@@ -76,6 +76,26 @@ buildkite_additional_tags: []
 buildkite_tags_from_host: true
 
 # =============================================================================
+# Service Scope
+# =============================================================================
+
+# How the agent process is supervised:
+#   system - root-owned systemd unit from the distro package (default)
+#   user   - per-user `systemctl --user` service under a real login account
+# buildkite_agent_service_scope: user
+#
+# Required when scope is "user": the existing login account to run the agent as.
+# buildkite_agent_run_user: "ci-runner"
+#
+# Optional: home dir (auto-detected from /etc/passwd) and path overrides.
+# In user scope, hooks/plugins live under ~/.config/buildkite-agent and builds
+# under ~/builds unless overridden here.
+# buildkite_agent_run_user_home: "/home/ci-runner"
+# buildkite_user_build_path: "/home/ci-runner/builds"
+# buildkite_user_hooks_path: ""
+# buildkite_user_plugins_path: ""
+
+# =============================================================================
 # Installation Options
 # =============================================================================
 

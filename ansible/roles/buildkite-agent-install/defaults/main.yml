@@ -1,4 +1,30 @@
 ---
+# =============================================================================
+# systemd service scope
+# =============================================================================
+# How the buildkite-agent process is supervised:
+#   system - root-owned unit shipped by the distro package, managed with
+#            `systemctl` (default; unchanged behavior).
+#   user   - per-user service managed with `systemctl --user`, running under an
+#            ordinary login account. Requires buildkite_agent_run_user.
+buildkite_agent_service_scope: system
+
+# Login account the agent runs as when buildkite_agent_service_scope is "user".
+# Must be an existing, real login user (not the buildkite-agent system user).
+buildkite_agent_run_user: ""
+
+# Home directory of the run user. Auto-detected from /etc/passwd when blank.
+buildkite_agent_run_user_home: ""
+
+# Path overrides for user scope. Blank values fall back to sensible defaults
+# under the run user's home directory:
+#   build   -> <run_user_home>/builds
+#   hooks   -> <run_user_home>/.config/buildkite-agent/hooks
+#   plugins -> <run_user_home>/.config/buildkite-agent/plugins
+buildkite_user_build_path: ""
+buildkite_user_hooks_path: ""
+buildkite_user_plugins_path: ""
+
 # Path to a directory that is shared between the Buildkite agent node and all
 # Slurm compute nodes (e.g. an NFS or Lustre mount). The command hook writes
 # the sbatch job log here so it can be tailed back to the Buildkite UI while
